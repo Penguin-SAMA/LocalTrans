@@ -1,4 +1,5 @@
 import argparse
+import os
 import shutil
 import signal
 import subprocess
@@ -82,38 +83,54 @@ def _copy_to_clipboard(text: str) -> None:
 _EVDEV_KEYCODES = {"c": 46, "v": 47}
 
 
+def _build_inject_cmd(tool: str, key: str) -> list[str] | None:
+    if tool == "ydotool":
+        keycode = _EVDEV_KEYCODES[key]
+        # Kernel-level /dev/uinput injection via ydotoold. Preferred on
+        # Wayland because it bypasses the virtual-keyboard protocol whose
+        # keymap handoff is buggy on several compositors (including niri):
+        # wtype-style injection can leave the focused surface stuck with
+        # wtype's synthetic keymap until the user refocuses.
+        return [
+            "ydotool",
+            "key",
+            "29:1",
+            f"{keycode}:1",
+            f"{keycode}:0",
+            "29:0",
+        ]
+    if tool == "wtype":
+        # -k dispatches as a key event so Ctrl actually combines with it.
+        return ["wtype", "-M", "ctrl", "-k", key, "-m", "ctrl"]
+    if tool == "xdotool":
+        return ["xdotool", "key", "--clearmodifiers", f"ctrl+{key}"]
+    return None
+
+
+def _resolve_inject_order() -> list[str]:
+    override = os.environ.get("LOCALTRANS_INJECT", "").strip().lower()
+    if override:
+        tools = [t.strip() for t in override.split(",") if t.strip()]
+    else:
+        tools = ["ydotool", "wtype", "xdotool"]
+    return [t for t in tools if shutil.which(t)]
+
+
 def _send_ctrl_key(key: str) -> None:
     if key not in _EVDEV_KEYCODES:
         raise TranslationError(f"不支持的组合键: ctrl+{key}")
 
-    candidates: list[list[str]] = []
-    if shutil.which("wtype"):
-        # -k sends as a key event (so Ctrl actually applies); without -k, wtype
-        # would type the literal letter via text_input and the modifier state
-        # does not combine with character input.
-        candidates.append(["wtype", "-M", "ctrl", "-k", key, "-m", "ctrl"])
-    if shutil.which("ydotool"):
-        keycode = _EVDEV_KEYCODES[key]
-        candidates.append(
-            [
-                "ydotool",
-                "key",
-                "29:1",
-                f"{keycode}:1",
-                f"{keycode}:0",
-                "29:0",
-            ]
-        )
-    if shutil.which("xdotool"):
-        candidates.append(["xdotool", "key", "--clearmodifiers", f"ctrl+{key}"])
-
-    if not candidates:
+    tools = _resolve_inject_order()
+    if not tools:
         raise TranslationError(
-            "未找到按键注入工具，请安装 wtype / ydotool / xdotool 后重试。"
+            "未找到按键注入工具，请安装 ydotool / wtype / xdotool 后重试。"
         )
 
     last_error: Exception | None = None
-    for cmd in candidates:
+    for tool in tools:
+        cmd = _build_inject_cmd(tool, key)
+        if cmd is None:
+            continue
         try:
             subprocess.run(cmd, check=True)
             return
