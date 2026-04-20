@@ -4,13 +4,62 @@ Command line translator for technical Chinese to English using a local LM Studio
 
 ## Install
 
+### Option 1 (recommended): `uv tool install`
+
 ```bash
-mamba create -y -p .mamba-venv python=3.12
-uv pip install --python .mamba-venv/bin/python -e .
-mamba activate .mamba-venv
+uv tool install .
 ```
 
-If your system only has `micromamba`, replace `mamba` with `micromamba`.
+After cloning this repository, run the command above in the project root.
+`uv` will install the tool into your current user environment and expose both `localtrans` and `lt`.
+
+### Option 2: `python -m pip install`
+
+```bash
+python -m pip install .
+```
+
+This installs the package in the current Python environment and provides `localtrans` / `lt`.
+
+### Option 3: `pipx install`
+
+```bash
+pipx install .
+```
+
+`pipx` installs the tool in an isolated environment for your current user, while still exposing `localtrans` / `lt` globally for your shell.
+
+## Upgrade and Uninstall
+
+### `uv tool`
+
+```bash
+# upgrade/reinstall from current repository
+uv tool install --reinstall .
+
+# uninstall
+uv tool uninstall localtrans
+```
+
+### `python -m pip`
+
+```bash
+# upgrade
+python -m pip install --upgrade .
+
+# uninstall
+python -m pip uninstall localtrans
+```
+
+### `pipx`
+
+```bash
+# upgrade from current repository
+pipx reinstall localtrans --spec .
+
+# uninstall
+pipx uninstall localtrans
+```
 
 ## Usage
 
