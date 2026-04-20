@@ -88,7 +88,10 @@ def _send_ctrl_key(key: str) -> None:
 
     candidates: list[list[str]] = []
     if shutil.which("wtype"):
-        candidates.append(["wtype", "-M", "ctrl", key, "-m", "ctrl"])
+        # -k sends as a key event (so Ctrl actually applies); without -k, wtype
+        # would type the literal letter via text_input and the modifier state
+        # does not combine with character input.
+        candidates.append(["wtype", "-M", "ctrl", "-k", key, "-m", "ctrl"])
     if shutil.which("ydotool"):
         keycode = _EVDEV_KEYCODES[key]
         candidates.append(
@@ -224,9 +227,13 @@ def _run_replace() -> int:
     # traceback even though the underlying flow is otherwise fine.
     prev_sigint = signal.signal(signal.SIGINT, signal.SIG_IGN)
     try:
-        # Give the user a moment to release the shortcut's modifier keys
-        # before we start injecting our own Ctrl+C / Ctrl+V.
-        time.sleep(0.12)
+        # Give the user a moment to physically release the shortcut's
+        # modifier keys (e.g. Super+Shift+T) before we start injecting our
+        # own Ctrl+C / Ctrl+V. If we inject while Super/Shift are still
+        # held, the compositor sees Ctrl+Super+Shift+C which is neither
+        # "copy" nor anything sensible, and leaves the modifier state
+        # confused.
+        time.sleep(0.25)
 
         try:
             _send_ctrl_key("c")
@@ -234,7 +241,7 @@ def _run_replace() -> int:
             _notify("替换失败", str(exc), urgency="critical")
             return 1
 
-        time.sleep(0.12)
+        time.sleep(0.15)
 
         text = _read_clipboard()
         if not text:
@@ -257,7 +264,7 @@ def _run_replace() -> int:
             _notify("替换失败", str(exc), urgency="critical")
             return 1
 
-        time.sleep(0.08)
+        time.sleep(0.12)
 
         try:
             _send_ctrl_key("v")
