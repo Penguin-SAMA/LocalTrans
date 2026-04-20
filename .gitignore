@@ -1,0 +1,30 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.mamba-venv/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.coverage
+tests/
+
+# Local config
+.env
+
+# Local AI/agent metadata
+.codex
+AGENTS.md

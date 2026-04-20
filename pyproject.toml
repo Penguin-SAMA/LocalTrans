@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "localtrans"
+version = "0.1.0"
+description = "Translate text to professional English using a local LM Studio model."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+  { name = "penguinsama" }
+]
+
+[project.scripts]
+localtrans = "localtrans_cli.cli:main"
+lt = "localtrans_cli.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
