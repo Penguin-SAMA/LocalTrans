@@ -70,9 +70,12 @@ localtrans init
 lt "这个函数会导致线程阻塞"
 echo "内存泄漏" | lt
 lt init
+lt -p "这个函数会导致线程阻塞"
 ```
 
 `localtrans init` 会提示输入模型名，并写入本地配置文件。
+
+`-p` / `--paste` 参数会将翻译结果复制到系统剪贴板，不在命令行输出；使用前需安装 `wl-clipboard`、`xclip` 或 `xsel`（macOS/Windows 分别使用内置的 `pbcopy` / `clip`）。
 
 ## Configuration
 
