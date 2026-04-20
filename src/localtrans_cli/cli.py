@@ -1,5 +1,6 @@
 import argparse
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -210,50 +211,65 @@ def _run_selection() -> int:
 
 
 def _run_replace() -> int:
-    # Give the user a moment to release the shortcut's modifier keys
-    # before we start injecting our own Ctrl+C / Ctrl+V.
-    time.sleep(0.12)
-
-    try:
-        _send_ctrl_key("c")
-    except TranslationError as exc:
-        _notify("替换失败", str(exc), urgency="critical")
-        return 1
-
-    time.sleep(0.12)
-
-    text = _read_clipboard()
-    if not text:
-        _notify(
-            "替换失败",
-            "未读取到选中文本（Ctrl+C 未抓到内容，请确认已选中）",
-            urgency="critical",
+    if sys.stdout.isatty() or sys.stdin.isatty():
+        print(
+            "警告: -v 在终端里直接运行无效——模拟的 Ctrl+C 会被本终端截获并终止本进程。\n"
+            "请把它绑定到窗口管理器快捷键（例如 Hyprland: bind = SUPER, T, exec, lt -v），\n"
+            "然后在浏览器/编辑器里选中文本后触发。",
+            file=sys.stderr,
         )
-        return 2
 
+    # Ignore SIGINT during the replace flow: our injected Ctrl+C can land on
+    # the calling terminal and SIGINT this process, producing a confusing
+    # traceback even though the underlying flow is otherwise fine.
+    prev_sigint = signal.signal(signal.SIGINT, signal.SIG_IGN)
     try:
-        translated = translate_text(text)
-    except TranslationError as exc:
-        _notify("替换失败", str(exc), urgency="critical")
-        return 1
+        # Give the user a moment to release the shortcut's modifier keys
+        # before we start injecting our own Ctrl+C / Ctrl+V.
+        time.sleep(0.12)
 
-    try:
-        _copy_to_clipboard(translated)
-    except TranslationError as exc:
-        _notify("替换失败", str(exc), urgency="critical")
-        return 1
+        try:
+            _send_ctrl_key("c")
+        except TranslationError as exc:
+            _notify("替换失败", str(exc), urgency="critical")
+            return 1
 
-    time.sleep(0.08)
+        time.sleep(0.12)
 
-    try:
-        _send_ctrl_key("v")
-    except TranslationError as exc:
-        _notify("替换失败", str(exc), urgency="critical")
-        return 1
+        text = _read_clipboard()
+        if not text:
+            _notify(
+                "替换失败",
+                "未读取到选中文本（Ctrl+C 未抓到内容，请确认已选中）",
+                urgency="critical",
+            )
+            return 2
 
-    preview = translated if len(translated) <= 200 else translated[:200] + "…"
-    _notify("替换完成", preview)
-    return 0
+        try:
+            translated = translate_text(text)
+        except TranslationError as exc:
+            _notify("替换失败", str(exc), urgency="critical")
+            return 1
+
+        try:
+            _copy_to_clipboard(translated)
+        except TranslationError as exc:
+            _notify("替换失败", str(exc), urgency="critical")
+            return 1
+
+        time.sleep(0.08)
+
+        try:
+            _send_ctrl_key("v")
+        except TranslationError as exc:
+            _notify("替换失败", str(exc), urgency="critical")
+            return 1
+
+        preview = translated if len(translated) <= 200 else translated[:200] + "…"
+        _notify("替换完成", preview)
+        return 0
+    finally:
+        signal.signal(signal.SIGINT, prev_sigint)
 
 
 def main() -> int:

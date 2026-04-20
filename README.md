@@ -93,6 +93,16 @@ bind = SUPER, T, exec, localtrans -s
 
 `-v` / `--replace` 参数会先模拟一次 `Ctrl+C` 把选中文本抓进剪贴板，翻译后再把译文写入剪贴板并模拟一次 `Ctrl+V` 覆盖选区，适合在浏览器、编辑器、聊天窗口等任何可输入控件中"原地替换"（Chromium 系应用在 Wayland 下不支持主选区读取，这种抓取方式是可靠的）。需要额外安装 `wtype`（Wayland）、`ydotool` 或 `xdotool`（X11）其一用于 `Ctrl+C` / `Ctrl+V` 的按键注入。执行结束后剪贴板内容为译文，不会自动恢复。
 
+> ⚠️ **`-v` 必须绑定到窗口管理器快捷键使用，不能在终端里直接 `lt -v` 运行。** 从终端运行时焦点在终端上，模拟出来的 Ctrl+C 会被终端截获并杀掉本进程自己。典型绑定示例：
+>
+> ```
+> # Hyprland
+> bind = SUPER, T, exec, lt -v
+>
+> # sway / i3
+> bindsym $mod+t exec --no-startup-id lt -v
+> ```
+
 ## Configuration
 
 - `TRANS_BASE_URL` (default: `http://localhost:1234/v1`)
