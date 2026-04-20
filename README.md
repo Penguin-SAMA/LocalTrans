@@ -72,6 +72,7 @@ echo "内存泄漏" | lt
 lt init
 lt -p "这个函数会导致线程阻塞"
 lt -s
+lt -v
 ```
 
 `localtrans init` 会提示输入模型名，并写入本地配置文件。
@@ -89,6 +90,8 @@ bind = SUPER, T, exec, localtrans -s
 ```
 
 触发前先用鼠标选中任意一段文本即可。需安装 `wl-clipboard` / `xclip` / `xsel` 其一用于读写剪贴板，以及 `libnotify`（提供 `notify-send`）用于通知。
+
+`-v` / `--replace` 参数会读取当前选中的文本，翻译后通过模拟键入的方式直接覆盖选区，不写入剪贴板，适合在编辑器 / 浏览器输入框等场景中"原地替换"。需要安装 `wtype`（Wayland）、`ydotool` 或 `xdotool`（X11）其一用于键盘事件注入，并同样依赖上面列出的剪贴板读取工具和 `notify-send`。
 
 ## Configuration
 

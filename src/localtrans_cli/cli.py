@@ -77,6 +77,31 @@ def _copy_to_clipboard(text: str) -> None:
     raise TranslationError(f"写入剪贴板失败: {last_error}")
 
 
+def _type_text(text: str) -> None:
+    candidates: list[list[str]] = []
+    if shutil.which("wtype"):
+        candidates.append(["wtype", "--", text])
+    if shutil.which("ydotool"):
+        candidates.append(["ydotool", "type", "--", text])
+    if shutil.which("xdotool"):
+        candidates.append(["xdotool", "type", "--clearmodifiers", "--", text])
+
+    if not candidates:
+        raise TranslationError(
+            "未找到按键注入工具，请安装 wtype / ydotool / xdotool 后重试。"
+        )
+
+    last_error: Exception | None = None
+    for cmd in candidates:
+        try:
+            subprocess.run(cmd, check=True)
+            return
+        except (subprocess.CalledProcessError, OSError) as exc:
+            last_error = exc
+
+    raise TranslationError(f"按键注入失败: {last_error}")
+
+
 def _notify(title: str, body: str, *, urgency: str = "normal") -> None:
     body = body.strip()
     if sys.platform == "darwin" and shutil.which("osascript"):
@@ -149,6 +174,29 @@ def _run_selection() -> int:
     return 0
 
 
+def _run_replace() -> int:
+    text = _read_from_selection()
+    if not text:
+        _notify("替换失败", "未读取到选中文本", urgency="critical")
+        return 2
+
+    try:
+        translated = translate_text(text)
+    except TranslationError as exc:
+        _notify("替换失败", str(exc), urgency="critical")
+        return 1
+
+    try:
+        _type_text(translated)
+    except TranslationError as exc:
+        _notify("替换失败", str(exc), urgency="critical")
+        return 1
+
+    preview = translated if len(translated) <= 200 else translated[:200] + "…"
+    _notify("替换完成", preview)
+    return 0
+
+
 def main() -> int:
     argv = sys.argv[1:]
     if argv and argv[0] == "init":
@@ -170,14 +218,30 @@ def main() -> int:
         action="store_true",
         help="读取系统主选区/剪贴板中的文本翻译后写回剪贴板，并通过系统通知提示。",
     )
+    parser.add_argument(
+        "-v",
+        "--replace",
+        action="store_true",
+        help="读取系统主选区/剪贴板中的文本，翻译后通过模拟键入直接替换选中内容。",
+    )
     parser.add_argument("text", nargs="*", help="Text to translate.")
     args = parser.parse_args(argv)
+
+    if args.selection and args.replace:
+        print("--selection 与 --replace 不能同时使用。", file=sys.stderr)
+        return 2
 
     if args.selection:
         if args.text:
             print("--selection 不接受位置参数。", file=sys.stderr)
             return 2
         return _run_selection()
+
+    if args.replace:
+        if args.text:
+            print("--replace 不接受位置参数。", file=sys.stderr)
+            return 2
+        return _run_replace()
 
     text = _read_input_text(args.text)
     if not text:
