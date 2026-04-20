@@ -71,11 +71,24 @@ lt "这个函数会导致线程阻塞"
 echo "内存泄漏" | lt
 lt init
 lt -p "这个函数会导致线程阻塞"
+lt -s
 ```
 
 `localtrans init` 会提示输入模型名，并写入本地配置文件。
 
 `-p` / `--paste` 参数会将翻译结果复制到系统剪贴板，不在命令行输出；使用前需安装 `wl-clipboard`、`xclip` 或 `xsel`（macOS/Windows 分别使用内置的 `pbcopy` / `clip`）。
+
+`-s` / `--selection` 参数会读取系统主选区（primary selection），若为空则回退到剪贴板，翻译后写回剪贴板，并通过系统通知（Linux `notify-send` / macOS `osascript`）提示结果。整个流程无终端输出，适合绑定窗口管理器快捷键，例如：
+
+```
+# i3 / sway
+bindsym $mod+t exec --no-startup-id localtrans -s
+
+# Hyprland
+bind = SUPER, T, exec, localtrans -s
+```
+
+触发前先用鼠标选中任意一段文本即可。需安装 `wl-clipboard` / `xclip` / `xsel` 其一用于读写剪贴板，以及 `libnotify`（提供 `notify-send`）用于通知。
 
 ## Configuration
 
