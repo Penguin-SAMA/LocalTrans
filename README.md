@@ -1,100 +1,175 @@
 # localtrans
 
-Command line translator for technical Chinese to English using a local LM Studio model.
+**English** | [简体中文](./README.zh-CN.md)
+
+> A command-line translator for technical text. Translates Chinese to professional English via any OpenAI-compatible local backend (LM Studio / Ollama / vLLM / …).
+
+Ships two equivalent commands: `localtrans` and `lt`.
+
+---
+
+## Table of Contents
+
+- [Install](#install)
+- [First-time setup: `lt init`](#first-time-setup-lt-init)
+- [Usage](#usage)
+- [Configuration](#configuration)
+  - [Environment variables](#environment-variables)
+  - [Config file](#config-file)
+  - [Backend recipes: LM Studio / Ollama / vLLM](#backend-recipes)
+- [Upgrade & Uninstall](#upgrade--uninstall)
+
+---
 
 ## Install
 
-### Option 1 (recommended): `uv tool install`
+`uv` is recommended. From the project root:
 
 ```bash
+# recommended
 uv tool install .
-```
 
-After cloning this repository, run the command above in the project root.
-`uv` will install the tool into your current user environment and expose both `localtrans` and `lt`.
+# or
+pipx install .
 
-### Option 2: `python -m pip install`
-
-```bash
+# or
 python -m pip install .
 ```
 
-This installs the package in the current Python environment and provides `localtrans` / `lt`.
+Both `localtrans` and `lt` will be available on your `PATH`.
 
-### Option 3: `pipx install`
+---
 
-```bash
-pipx install .
-```
+## First-time setup: `lt init`
 
-`pipx` installs the tool in an isolated environment for your current user, while still exposing `localtrans` / `lt` globally for your shell.
-
-## Upgrade and Uninstall
-
-### `uv tool`
+**Run this right after installing.** It prompts for the model name and writes it to the local config file:
 
 ```bash
-# upgrade/reinstall from current repository
-uv tool install --reinstall .
-
-# uninstall
-uv tool uninstall localtrans
+lt init
 ```
 
-### `python -m pip`
+Enter the model identifier to use (e.g. `gemma-3-4b-it`, `qwen2.5:7b`). It is written to:
 
-```bash
-# upgrade
-python -m pip install --upgrade .
-
-# uninstall
-python -m pip uninstall localtrans
+```
+~/.config/localtrans/config.json
 ```
 
-### `pipx`
+> To change the backend URL, timeout, reasoning mode, etc., see [Configuration](#configuration) below.
 
-```bash
-# upgrade from current repository
-pipx reinstall localtrans --spec .
-
-# uninstall
-pipx uninstall localtrans
-```
+---
 
 ## Usage
 
+### Basic translation
+
 ```bash
-localtrans "这个函数会导致线程阻塞"
-echo "内存泄漏" | localtrans
-localtrans init
 lt "这个函数会导致线程阻塞"
 echo "内存泄漏" | lt
-lt init
+```
+
+### `-p` / `--paste`: copy result to clipboard
+
+The translation is written to the clipboard instead of stdout.
+
+```bash
 lt -p "这个函数会导致线程阻塞"
+```
+
+Requires one of: `wl-clipboard` / `xclip` / `xsel` (Linux), `pbcopy` (macOS), `clip` (Windows).
+
+### `-s` / `--selection`: translate the current selection
+
+Reads the system primary selection (falls back to the clipboard if empty), writes the result back to the clipboard, and sends a desktop notification. No terminal output — ideal for a global hotkey.
+
+```bash
 lt -s
 ```
 
-`localtrans init` 会提示输入模型名，并写入本地配置文件。
+Window-manager examples:
 
-`-p` / `--paste` 参数会将翻译结果复制到系统剪贴板，不在命令行输出；使用前需安装 `wl-clipboard`、`xclip` 或 `xsel`（macOS/Windows 分别使用内置的 `pbcopy` / `clip`）。
-
-`-s` / `--selection` 参数会读取系统主选区（primary selection），若为空则回退到剪贴板，翻译后写回剪贴板，并通过系统通知（Linux `notify-send` / macOS `osascript`）提示结果。整个流程无终端输出，适合绑定窗口管理器快捷键，例如：
-
-```
+```conf
 # i3 / sway
-bindsym $mod+t exec --no-startup-id localtrans -s
+bindsym $mod+t exec --no-startup-id lt -s
 
 # Hyprland
-bind = SUPER, T, exec, localtrans -s
+bind = SUPER, T, exec, lt -s
 ```
 
-触发前先用鼠标选中任意一段文本即可。需安装 `wl-clipboard` / `xclip` / `xsel` 其一用于读写剪贴板，以及 `libnotify`（提供 `notify-send`）用于通知。
+Requires: one of `wl-clipboard` / `xclip` / `xsel`, plus `libnotify` (`notify-send`).
+
+---
 
 ## Configuration
 
-- `TRANS_BASE_URL` (default: `http://localhost:1234/v1`)
-- `TRANS_MODEL` (highest priority, default from config or `gemma-4-e4b`)
-- `TRANS_TIMEOUT` in seconds (default: `60`)
-- `TRANS_DISABLE_THINKING` (default: `false`; set to `true` to send `reasoning_effort` and disable thinking mode)
-- `TRANS_REASONING_EFFORT` (default: `none`)
-- Config file: `~/.config/localtrans/config.json` (`XDG_CONFIG_HOME`/`LOCALTRANS_CONFIG_PATH` 可覆盖)
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `TRANS_BASE_URL` | `http://localhost:1234/v1` | OpenAI-compatible endpoint |
+| `TRANS_MODEL` | config file / `gemma-4-e4b` | Model id (env var wins over config) |
+| `TRANS_TIMEOUT` | `60` | Request timeout, seconds |
+| `TRANS_DISABLE_THINKING` | `false` | When `true`, sends `reasoning_effort` to disable thinking |
+| `TRANS_REASONING_EFFORT` | `none` | Paired with the option above |
+| `LOCALTRANS_CONFIG_PATH` | — | Override config file path |
+| `XDG_CONFIG_HOME` | — | Override the config root directory |
+
+### Config file
+
+Path: `~/.config/localtrans/config.json` (overridable via `LOCALTRANS_CONFIG_PATH` / `XDG_CONFIG_HOME`).
+
+`lt init` only writes the `model` field. For other settings, edit the file directly or use environment variables.
+
+### Backend recipes
+
+<details>
+<summary><b>LM Studio</b> (default)</summary>
+
+LM Studio listens on `http://localhost:1234/v1` out of the box — no extra setup needed:
+
+```bash
+lt init   # enter the model name currently loaded in LM Studio
+```
+</details>
+
+<details>
+<summary><b>Ollama</b></summary>
+
+Ollama exposes an OpenAI-compatible API on port `11434`. Point `localtrans` at it:
+
+```bash
+export TRANS_BASE_URL="http://localhost:11434/v1"
+lt init   # enter an Ollama model name, e.g. qwen2.5:7b
+```
+
+Add the `export` line to your shell rc (`.zshrc` / `.bashrc`) to make it persistent.
+</details>
+
+<details>
+<summary><b>vLLM / other OpenAI-compatible servers</b></summary>
+
+Any server exposing `/v1/chat/completions` works — just set the base URL:
+
+```bash
+export TRANS_BASE_URL="http://your-host:8000/v1"
+export TRANS_MODEL="your-model-id"
+```
+</details>
+
+<details>
+<summary><b>Disable thinking mode (Qwen3 / DeepSeek-R1 / …)</b></summary>
+
+```bash
+export TRANS_DISABLE_THINKING=true
+export TRANS_REASONING_EFFORT=none
+```
+</details>
+
+---
+
+## Upgrade & Uninstall
+
+| Tool | Upgrade | Uninstall |
+|---|---|---|
+| `uv tool` | `uv tool install --reinstall .` | `uv tool uninstall localtrans` |
+| `pipx` | `pipx reinstall localtrans --spec .` | `pipx uninstall localtrans` |
+| `pip` | `python -m pip install --upgrade .` | `python -m pip uninstall localtrans` |
