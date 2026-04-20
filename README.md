@@ -91,7 +91,7 @@ bind = SUPER, T, exec, localtrans -s
 
 触发前先用鼠标选中任意一段文本即可。需安装 `wl-clipboard` / `xclip` / `xsel` 其一用于读写剪贴板，以及 `libnotify`（提供 `notify-send`）用于通知。
 
-`-v` / `--replace` 参数会读取当前选中的文本，翻译后通过模拟键入的方式直接覆盖选区，不写入剪贴板，适合在编辑器 / 浏览器输入框等场景中"原地替换"。需要安装 `wtype`（Wayland）、`ydotool` 或 `xdotool`（X11）其一用于键盘事件注入，并同样依赖上面列出的剪贴板读取工具和 `notify-send`。
+`-v` / `--replace` 参数会先模拟一次 `Ctrl+C` 把选中文本抓进剪贴板，翻译后再把译文写入剪贴板并模拟一次 `Ctrl+V` 覆盖选区，适合在浏览器、编辑器、聊天窗口等任何可输入控件中"原地替换"（Chromium 系应用在 Wayland 下不支持主选区读取，这种抓取方式是可靠的）。需要额外安装 `wtype`（Wayland）、`ydotool` 或 `xdotool`（X11）其一用于 `Ctrl+C` / `Ctrl+V` 的按键注入。执行结束后剪贴板内容为译文，不会自动恢复。
 
 ## Configuration
 

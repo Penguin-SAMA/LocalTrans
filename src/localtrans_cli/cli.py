@@ -2,6 +2,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+import time
 
 from localtrans_cli.translator import TranslationError, configure_model, translate_text
 
@@ -77,14 +78,30 @@ def _copy_to_clipboard(text: str) -> None:
     raise TranslationError(f"写入剪贴板失败: {last_error}")
 
 
-def _type_text(text: str) -> None:
+_EVDEV_KEYCODES = {"c": 46, "v": 47}
+
+
+def _send_ctrl_key(key: str) -> None:
+    if key not in _EVDEV_KEYCODES:
+        raise TranslationError(f"不支持的组合键: ctrl+{key}")
+
     candidates: list[list[str]] = []
     if shutil.which("wtype"):
-        candidates.append(["wtype", "--", text])
+        candidates.append(["wtype", "-M", "ctrl", key, "-m", "ctrl"])
     if shutil.which("ydotool"):
-        candidates.append(["ydotool", "type", "--", text])
+        keycode = _EVDEV_KEYCODES[key]
+        candidates.append(
+            [
+                "ydotool",
+                "key",
+                "29:1",
+                f"{keycode}:1",
+                f"{keycode}:0",
+                "29:0",
+            ]
+        )
     if shutil.which("xdotool"):
-        candidates.append(["xdotool", "type", "--clearmodifiers", "--", text])
+        candidates.append(["xdotool", "key", "--clearmodifiers", f"ctrl+{key}"])
 
     if not candidates:
         raise TranslationError(
@@ -100,6 +117,24 @@ def _type_text(text: str) -> None:
             last_error = exc
 
     raise TranslationError(f"按键注入失败: {last_error}")
+
+
+def _read_clipboard() -> str:
+    clipboard: list[list[str]] = []
+    if shutil.which("wl-paste"):
+        clipboard.append(["wl-paste", "--no-newline"])
+    if shutil.which("xclip"):
+        clipboard.append(["xclip", "-o", "-selection", "clipboard"])
+    if shutil.which("xsel"):
+        clipboard.append(["xsel", "--clipboard", "--output"])
+    if sys.platform == "darwin" and shutil.which("pbpaste"):
+        clipboard.append(["pbpaste"])
+
+    for cmd in clipboard:
+        out = _run_capture(cmd)
+        if out and out.strip():
+            return out.strip()
+    return ""
 
 
 def _notify(title: str, body: str, *, urgency: str = "normal") -> None:
@@ -175,9 +210,25 @@ def _run_selection() -> int:
 
 
 def _run_replace() -> int:
-    text = _read_from_selection()
+    # Give the user a moment to release the shortcut's modifier keys
+    # before we start injecting our own Ctrl+C / Ctrl+V.
+    time.sleep(0.12)
+
+    try:
+        _send_ctrl_key("c")
+    except TranslationError as exc:
+        _notify("替换失败", str(exc), urgency="critical")
+        return 1
+
+    time.sleep(0.12)
+
+    text = _read_clipboard()
     if not text:
-        _notify("替换失败", "未读取到选中文本", urgency="critical")
+        _notify(
+            "替换失败",
+            "未读取到选中文本（Ctrl+C 未抓到内容，请确认已选中）",
+            urgency="critical",
+        )
         return 2
 
     try:
@@ -187,7 +238,15 @@ def _run_replace() -> int:
         return 1
 
     try:
-        _type_text(translated)
+        _copy_to_clipboard(translated)
+    except TranslationError as exc:
+        _notify("替换失败", str(exc), urgency="critical")
+        return 1
+
+    time.sleep(0.08)
+
+    try:
+        _send_ctrl_key("v")
     except TranslationError as exc:
         _notify("替换失败", str(exc), urgency="critical")
         return 1
@@ -222,7 +281,7 @@ def main() -> int:
         "-v",
         "--replace",
         action="store_true",
-        help="读取系统主选区/剪贴板中的文本，翻译后通过模拟键入直接替换选中内容。",
+        help="对当前选中文本发起 Ctrl+C 抓取、翻译后再通过 Ctrl+V 粘贴覆盖选区。",
     )
     parser.add_argument("text", nargs="*", help="Text to translate.")
     args = parser.parse_args(argv)
