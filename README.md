@@ -83,6 +83,7 @@ Reads the system primary selection (falls back to the clipboard if empty), write
 
 ```bash
 lt -s
+lt -v
 ```
 
 Window-manager examples:
@@ -98,6 +99,22 @@ bind = SUPER, T, exec, lt -s
 Requires: one of `wl-clipboard` / `xclip` / `xsel`, plus `libnotify` (`notify-send`).
 
 ---
+
+`-v` / `--replace` 参数会先模拟一次 `Ctrl+C` 把选中文本抓进剪贴板，翻译后再把译文写入剪贴板并模拟一次 `Ctrl+V` 覆盖选区，适合在浏览器、编辑器、聊天窗口等任何可输入控件中"原地替换"（Chromium 系应用在 Wayland 下不支持主选区读取，这种抓取方式是可靠的）。执行结束后剪贴板内容为译文，不会自动恢复。
+
+按键注入后端优先级：`ydotool` → `wtype` → `xdotool`。**在 Wayland（niri / Hyprland / sway 等）下强烈建议装 `ydotool` 并启用 `ydotoold` 服务**——它走 `/dev/uinput` 从内核注入，经过真实输入设备路径，compositor 用真实 keymap 解析；而 `wtype` 通过 virtual-keyboard 协议合成自己的 keymap，部分 compositor（包括 niri）在虚拟键盘断开后没能正确给 focused surface 重发真实 keymap，表现就是"替换完成后当前应用里按键错位（比如 Esc 变 v），切换一次窗口后恢复"。
+
+可以用环境变量 `LOCALTRANS_INJECT` 强制指定后端，例如 `LOCALTRANS_INJECT=ydotool lt -v`。
+
+> ⚠️ **`-v` 必须绑定到窗口管理器快捷键使用，不能在终端里直接 `lt -v` 运行。** 从终端运行时焦点在终端上，模拟出来的 Ctrl+C 会被终端截获并杀掉本进程自己。典型绑定示例：
+>
+> ```
+> # Hyprland
+> bind = SUPER, T, exec, lt -v
+>
+> # sway / i3
+> bindsym $mod+t exec --no-startup-id lt -v
+> ```
 
 ## Configuration
 
